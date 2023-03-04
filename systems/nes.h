@@ -95,7 +95,68 @@ typedef struct {
     uint8_t reserved_1[7];
 } nes_cartridge_header;
 
-// configuration parameters for nes_init()
+typedef struct {
+    chips_audio_desc_t audio;
+    chips_debug_t debug;
+} nes_desc_t;
+
+typedef union {
+    struct {
+        uint8_t right:  1;
+        uint8_t left:   1;
+        uint8_t down:   1;
+        uint8_t up:     1;
+        uint8_t start:  1;
+        uint8_t select: 1;
+        uint8_t b:      1;
+        uint8_t a:      1;
+    };
+    uint8_t value;
+} controller_t;
+
+typedef enum {
+    Horizontal  = 0,
+    Vertical    = 1,
+    FourScreen  = 8,
+    OneScreenLower,
+    OneScreenHigher,
+} name_table_mirroring_t;
+
+typedef struct {
+    uint8_t (*read_prg)(uint16_t address, void* user_data);
+    void (*write_prg)(uint16_t address, uint8_t value, void* user_data);
+    uint8_t (*read_chr)(uint16_t address, void* user_data);
+    void (*write_chr)(uint16_t addr, uint8_t data, void* user_data);
+
+    union {
+        struct {
+            uint8_t chr_bank_sel4[2];
+            uint8_t chr_bank_sel8;
+
+            uint8_t prg_bank_sel16[2];
+            uint8_t prg_bank_sel32;
+
+            uint8_t load_reg;
+            uint8_t load_reg_count;
+            uint8_t ctrl_reg;
+        } data1;
+        struct {
+            uint8_t select_prg;
+        } data2;
+        struct {
+            uint8_t select_chr;
+        } data3;
+        struct {
+            uint8_t prg_bank;
+        } data7;
+        struct {
+            uint8_t prg_bank;
+            uint8_t chr_bank;
+        } data66;
+    };
+    name_table_mirroring_t mirroring;
+} nes_mapper_t;
+
 typedef struct {
     chips_audio_desc_t audio;
     chips_debug_t debug;
@@ -383,25 +444,15 @@ void nes_init(nes_t* sys, const nes_desc_t* desc) {
         .set_pixels = _ppu_set_pixels,
         .user_data = sys,
     });
-    _nes_use_mapper(sys, 0);
-}
 
-bool nes_cartridge_inserted(nes_t* sys) {
-    CHIPS_ASSERT(sys && sys->valid);
-    return sys->cart.header.magic[0];
-}
-
-void nes_remove_cartridge(nes_t* sys) {
-    CHIPS_ASSERT(sys && sys->valid);
-    memset(&sys->cart, 0, sizeof(sys->cart));
-    memset(&sys->ram, 0, sizeof(sys->ram));
-    memset(&sys->extended_ram, 0, sizeof(sys->extended_ram));
-    memset(&sys->ram, 0, sizeof(sys->ram));
-    memset(&sys->ppu_ram, 0, sizeof(sys->ppu_ram));
-    memset(&sys->ppu_pal_ram, 0, sizeof(sys->ppu_pal_ram));
-    memset(&sys->ppu_name_table, 0, sizeof(sys->ppu_name_table));
-    _nes_use_mapper(sys, 0);
-    nes_reset(sys);
+    mem_init(&sys->mem);
+    // TODO: too bad, I can't use 4 pages of 0x800 size like this:
+    //mem_map_ram(&sys->mem, 0, 0x0000, 0x0800, sys->ram);
+    //mem_map_ram(&sys->mem, 0, 0x0800, 0x0800, sys->ram);
+    //mem_map_ram(&sys->mem, 0, 0x1000, 0x0800, sys->ram);
+    //mem_map_ram(&sys->mem, 0, 0x1800, 0x0800, sys->ram);
+    mem_map_ram(&sys->mem, 0, 0x0000, 0x2000, sys->ram);
+    mem_map_ram(&sys->mem, 1, 0x8000, 0x8000, sys->cart.rom);
 }
 
 void nes_discard(nes_t* sys) {
