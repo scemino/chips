@@ -76,6 +76,7 @@ typedef struct {
     const char* layers[UI_MEMEDIT_MAX_LAYERS];   /* memory system layer names */
     ui_memedit_read_t read_cb;
     ui_memedit_write_t write_cb;
+    size_t max_addr;
     int num_rows;       /* initial number of rows, default is 16 */
     bool hide_ascii;    /* initially hide the ASCII column */
     bool hide_options;  /* hide the Options dropdown */
@@ -668,7 +669,7 @@ void ui_memedit_draw(ui_memedit_t* win) {
 
 void ui_memedit_draw_content(ui_memedit_t* win) {
     CHIPS_ASSERT(win && win->valid);
-    win->ed->DrawContents((uint8_t*)win, (1<<16));
+    win->ed->DrawContents((uint8_t*)win, win->max_addr);
 }
 #ifdef _MSC_VER
 #pragma warning(pop)
